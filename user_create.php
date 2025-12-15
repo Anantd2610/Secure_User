@@ -9,24 +9,31 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $password = $_POST['password'] ?? '';
     $is_admin = isset($_POST['is_admin']) ? 1 : 0;
 
-    $stmt = mysqli_prepare(
-        $conn,
-        "INSERT INTO users (username, password_plain, is_admin)
-         VALUES (?, ?, ?)"
-    );
-
-    if ($stmt) {
-        mysqli_stmt_bind_param($stmt, 'ssi', $username, $password, $is_admin);
-
-        if (mysqli_stmt_execute($stmt)) {
-            $message = 'User created';
-        } else {
-            $message = 'Error: ' . htmlspecialchars(mysqli_error($conn), ENT_QUOTES, 'UTF-8');
-        }
+    if ($username === '' || $password === '') {
+        $message = 'Username and password are required';
     } else {
-        $message = 'Error preparing statement';
+        $hash = password_hash($password, PASSWORD_DEFAULT);
+
+        $stmt = mysqli_prepare(
+            $conn,
+            "INSERT INTO users (username, password_plain, password_hash, is_admin)
+             VALUES (?, ?, ?, ?)"
+        );
+
+        if ($stmt) {
+            mysqli_stmt_bind_param($stmt, 'sssi', $username, $password, $hash, $is_admin);
+
+            if (mysqli_stmt_execute($stmt)) {
+                $message = 'User created';
+            } else {
+                $message = 'Error: ' . htmlspecialchars(mysqli_error($conn), ENT_QUOTES, 'UTF-8');
+            }
+        } else {
+            $message = 'Error preparing statement';
+        }
     }
 }
+
 ?>
 <!DOCTYPE html>
 <html>

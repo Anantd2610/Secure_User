@@ -23,9 +23,29 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
         if ($result && mysqli_num_rows($result) === 1) {
             $row = mysqli_fetch_assoc($result);
+            $ok  = false;
 
-            // For now, still compare plaintext (hashing comes in Fix 2)
-            if ($password === $row['password_plain']) {
+            if (!empty($row['password_hash'])) {
+                // New users or migrated users – use hash
+                $ok = password_verify($password, $row['password_hash']);
+            } else {
+                // Legacy users – still plaintext, migrate on first successful login
+                if ($password === $row['password_plain']) {
+                    $ok = true;
+                    $new_hash = password_hash($password, PASSWORD_DEFAULT);
+
+                    $update = mysqli_prepare(
+                    $conn,
+                    "UPDATE users SET password_hash = ? WHERE id = ?"
+                    );
+                    if ($update) {
+                        mysqli_stmt_bind_param($update, 'si', $new_hash, $row['id']);
+                        mysqli_stmt_execute($update);
+                    }
+                }
+            }
+
+            if ($ok) {
                 $_SESSION['user_id']  = $row['id'];
                 $_SESSION['username'] = $row['username'];
                 $_SESSION['is_admin'] = $row['is_admin'];

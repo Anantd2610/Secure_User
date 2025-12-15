@@ -23,14 +23,45 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $password = $_POST['password'] ?? '';
     $is_admin = isset($_POST['is_admin']) ? 1 : 0;
 
-    $update = mysqli_prepare(
-        $conn,
-        "UPDATE users
-         SET username = ?, password_plain = ?, is_admin = ?
-         WHERE id = ?"
-    );
-    mysqli_stmt_bind_param($update, 'ssii', $username, $password, $is_admin, $id);
+    if ($username === '') {
+        $message = 'Username is required';
+        } else {
+            if ($password !== '') {
+                // change plaintext + hash
+                $hash = password_hash($password, PASSWORD_DEFAULT);
 
+                $update = mysqli_prepare(
+                    $conn,
+                    "UPDATE users
+                     SET username = ?, password_plain = ?, password_hash = ?, is_admin = ?
+                     WHERE id = ?"
+                );
+                mysqli_stmt_bind_param(
+                    $update,
+                    'sssii',
+                    $username,
+                    $password,
+                    $hash,
+                    $is_admin,
+                    $id
+                );
+            } else {
+                // only username / is_admin change
+                $update = mysqli_prepare(
+                    $conn,
+                    "UPDATE users
+                     SET username = ?, is_admin = ?
+                     WHERE id = ?"
+                );
+                mysqli_stmt_bind_param(
+                    $update,
+                    'sii',
+                    $username,
+                    $is_admin,
+                    $id
+                );
+            }   
+    }
     if ($update && mysqli_stmt_execute($update)) {
         $message = 'User updated';
 
