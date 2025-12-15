@@ -5,31 +5,39 @@ require 'db.php';
 $message = '';
 
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
-    $username = $_POST['username']; // no validation
-    $password = $_POST['password']; // stored as plaintext
+    $username = $_POST['username'] ?? '';
+    $password = $_POST['password'] ?? '';
     $is_admin = isset($_POST['is_admin']) ? 1 : 0;
 
-    // VULNERABLE: SQL injection and plaintext password
-    $sql = "INSERT INTO users (username, password_plain, is_admin)
-            VALUES ('$username', '$password', $is_admin)";
+    $stmt = mysqli_prepare(
+        $conn,
+        "INSERT INTO users (username, password_plain, is_admin)
+         VALUES (?, ?, ?)"
+    );
 
-    if (mysqli_query($conn, $sql)) {
-        $message = 'User created';
+    if ($stmt) {
+        mysqli_stmt_bind_param($stmt, 'ssi', $username, $password, $is_admin);
+
+        if (mysqli_stmt_execute($stmt)) {
+            $message = 'User created';
+        } else {
+            $message = 'Error: ' . htmlspecialchars(mysqli_error($conn), ENT_QUOTES, 'UTF-8');
+        }
     } else {
-        $message = 'Error: ' . mysqli_error($conn);
+        $message = 'Error preparing statement';
     }
 }
 ?>
 <!DOCTYPE html>
 <html>
 <head>
-    <title>Create user (Vulnerable)</title>
+    <title>Create user</title>
 </head>
 <body>
-    <h1>Create user (VULNERABLE)</h1>
+    <h1>Create user</h1>
 
     <?php if ($message): ?>
-        <p><?php echo $message; ?></p>
+        <p><?php echo htmlspecialchars($message, ENT_QUOTES, 'UTF-8'); ?></p>
     <?php endif; ?>
 
     <form method="post">
@@ -42,8 +50,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         </label><br><br>
 
         <label>
-            <input type="checkbox" name="is_admin" value="1">
-            Is admin
+            <input type="checkbox" name="is_admin" value="1"> Is admin
         </label><br><br>
 
         <button type="submit">Create</button>

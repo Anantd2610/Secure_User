@@ -4,59 +4,71 @@ require 'db.php';
 
 $id = isset($_GET['id']) ? (int)$_GET['id'] : 0;
 
-// VULNERABLE: anyone can edit any ID
-$sql    = "SELECT * FROM users WHERE id = $id";
-$result = mysqli_query($conn, $sql);
+// Fetch user
+$stmt = mysqli_prepare(
+    $conn,
+    "SELECT id, username, password_plain, is_admin
+     FROM users
+     WHERE id = ?"
+);
+mysqli_stmt_bind_param($stmt, 'i', $id);
+mysqli_stmt_execute($stmt);
+$result = mysqli_stmt_get_result($stmt);
 $user   = $result ? mysqli_fetch_assoc($result) : null;
 
 $message = '';
 
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
-    $username = $_POST['username']; // no validation
-    $password = $_POST['password']; // plaintext
+    $username = $_POST['username'] ?? '';
+    $password = $_POST['password'] ?? '';
     $is_admin = isset($_POST['is_admin']) ? 1 : 0;
 
-    // VULNERABLE: no access control, SQL injection
-    $update_sql = "UPDATE users
-                   SET username = '$username',
-                       password_plain = '$password',
-                       is_admin = $is_admin
-                   WHERE id = $id";
+    $update = mysqli_prepare(
+        $conn,
+        "UPDATE users
+         SET username = ?, password_plain = ?, is_admin = ?
+         WHERE id = ?"
+    );
+    mysqli_stmt_bind_param($update, 'ssii', $username, $password, $is_admin, $id);
 
-    if (mysqli_query($conn, $update_sql)) {
+    if ($update && mysqli_stmt_execute($update)) {
         $message = 'User updated';
 
-        $result = mysqli_query($conn, "SELECT * FROM users WHERE id = $id");
+        mysqli_stmt_execute($stmt);
+        $result = mysqli_stmt_get_result($stmt);
         $user   = $result ? mysqli_fetch_assoc($result) : null;
     } else {
-        $message = 'Error: ' . mysqli_error($conn);
+        $message = 'Error: ' . htmlspecialchars(mysqli_error($conn), ENT_QUOTES, 'UTF-8');
     }
 }
 ?>
 <!DOCTYPE html>
 <html>
 <head>
-    <title>Edit user (Vulnerable)</title>
+    <title>Edit user</title>
 </head>
 <body>
-    <h1>Edit user (VULNERABLE)</h1>
+    <h1>Edit user</h1>
 
     <?php if ($message): ?>
-        <p><?php echo $message; ?></p>
+        <p><?php echo htmlspecialchars($message, ENT_QUOTES, 'UTF-8'); ?></p>
     <?php endif; ?>
 
     <?php if ($user): ?>
         <form method="post">
             <label>Username:
-                <input type="text" name="username" value="<?php echo $user['username']; ?>">
+                <input type="text" name="username"
+                       value="<?php echo htmlspecialchars($user['username'], ENT_QUOTES, 'UTF-8'); ?>">
             </label><br><br>
 
             <label>Password:
-                <input type="text" name="password" value="<?php echo $user['password_plain']; ?>">
+                <input type="text" name="password"
+                       value="<?php echo htmlspecialchars($user['password_plain'], ENT_QUOTES, 'UTF-8'); ?>">
             </label><br><br>
 
             <label>
-                <input type="checkbox" name="is_admin" value="1" <?php echo $user['is_admin'] ? 'checked' : ''; ?>>
+                <input type="checkbox" name="is_admin" value="1"
+                    <?php echo $user['is_admin'] ? 'checked' : ''; ?>>
                 Is admin
             </label><br><br>
 

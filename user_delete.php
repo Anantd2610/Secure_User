@@ -2,12 +2,14 @@
 session_start();
 require 'db.php';
 
-// VULNERABLE: no authentication or authorization check
 $id = isset($_GET['id']) ? (int)$_GET['id'] : 0;
 
 if ($id > 0) {
-    $sql = "DELETE FROM users WHERE id = $id";
-    mysqli_query($conn, $sql);
+    $stmt = mysqli_prepare($conn, "DELETE FROM users WHERE id = ?");
+    if ($stmt) {
+        mysqli_stmt_bind_param($stmt, 'i', $id);
+        mysqli_stmt_execute($stmt);
+    }
 }
 
 header('Location: index.php');
